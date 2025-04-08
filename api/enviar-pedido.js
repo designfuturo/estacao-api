@@ -1,5 +1,3 @@
-// Arquivo: /api/enviar-pedido.js
-
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader("Access-Control-Allow-Origin", "https://estacaodomel.com.br");
@@ -22,6 +20,7 @@ export default async function handler(req, res) {
     email,
     telefone,
     dataEvento,
+    dataNascimento,
     qtdInteira,
     qtdMeia,
     qtdGratis,
@@ -48,6 +47,7 @@ export default async function handler(req, res) {
         email,
         telefone,
         dataEvento,
+        dataNascimento,
         qtdInteira,
         qtdMeia,
         qtdGratis,
@@ -59,6 +59,10 @@ export default async function handler(req, res) {
       const text = await response.text();
       return res.status(500).json({ error: "Erro ao enviar para o Make", detalhe: text });
     }
+
+    // Se quiser retornar a resposta do Make para debug:
+    // const makeResponse = await response.json();
+    // return res.status(200).json({ ok: true, makeResponse });
 
     return res.status(200).json({ ok: true });
   } catch (err) {
