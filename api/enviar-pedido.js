@@ -44,7 +44,7 @@ export default async function handler(req, res) {
         "x-secret-key": secret,
       },
       body: JSON.stringify({
-        name: nome, // <- corrigido para o Asaas
+        name: nome,
         email,
         telefone,
         cpf,
@@ -58,12 +58,14 @@ export default async function handler(req, res) {
       }),
     })
 
+    const data = await response.json()
+
     if (!response.ok) {
-      const text = await response.text()
-      return res.status(500).json({ error: "Erro ao enviar para o Make", detalhe: text })
+      return res.status(500).json({ error: "Erro ao enviar para o Make", detalhe: data })
     }
 
-    return res.status(200).json({ ok: true })
+    // Retorna a URL do pagamento para o front
+    return res.status(200).json({ ok: true, url: data.linkPagamento || data.invoiceUrl })
   } catch (err) {
     return res.status(500).json({ error: "Erro interno", detalhe: err.message })
   }
