@@ -44,7 +44,7 @@ export default async function handler(req, res) {
         "x-secret-key": secret,
       },
       body: JSON.stringify({
-        nome,
+        name: nome, // <- corrigido para o Asaas
         email,
         telefone,
         cpf,
