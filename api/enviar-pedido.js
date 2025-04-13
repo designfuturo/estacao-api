@@ -58,15 +58,29 @@ export default async function handler(req, res) {
       }),
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      return res.status(500).json({ error: "Erro ao enviar para o Make", detalhe: data })
+      const text = await response.text()
+      console.error("Erro Make:", text)
+      return res.status(500).json({
+        error: "Erro ao enviar para o Make",
+        detalhe: text,
+      })
     }
 
-    // Retorna a URL do pagamento para o front
-    return res.status(200).json({ ok: true, url: data.linkPagamento || data.invoiceUrl })
+    const resposta = await response.json()
+
+    if (resposta?.linkPagamento) {
+      return res.status(200).json({ ok: true, linkPagamento: resposta.linkPagamento })
+    } else {
+      console.error("Resposta inesperada do Make:", resposta)
+      return res.status(500).json({
+        error: "Resposta do Make sem linkPagamento",
+        detalhe: resposta,
+      })
+    }
+
   } catch (err) {
+    console.error("Erro interno:", err.message)
     return res.status(500).json({ error: "Erro interno", detalhe: err.message })
   }
 }
