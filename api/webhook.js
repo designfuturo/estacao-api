@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    await fetch("https://hook.integromat.com/SEU_WEBHOOK_MAKE", {
+    await fetch("https://hook.us2.make.com/urh3qrkkaikwcftjimdjh1w1i9sh7mge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),
