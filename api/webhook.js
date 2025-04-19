@@ -5,7 +5,17 @@ export default async function handler(req, res) {
 
   const { event, payment, status, nome } = req.body;
 
-  if (event !== "PAYMENT_RECEIVED" && status !== "pago") {
+  // 1. Checar status de pagamento por requisição ativa
+  if (event === "CHECK_STATUS") {
+    const session = sessionStorage.getItem("statusPagamento");
+    if (session) {
+      return res.status(200).json(JSON.parse(session));
+    }
+    return res.status(200).json({ status: "pendente" });
+  }
+
+  // 2. Webhook real do Asaas
+  if (event !== "PAYMENT_RECEIVED") {
     return res.status(200).json({ message: "Evento ignorado" });
   }
 
@@ -16,11 +26,7 @@ export default async function handler(req, res) {
       body: JSON.stringify(req.body),
     });
 
-    // Agora retornamos o status e nome para o navegador
-    return res.status(200).json({
-      status: "pago",
-      nome: nome || (payment?.customer || "Cliente"),
-    });
+    return res.status(200).json({ message: "Webhook processado com sucesso" });
   } catch (error) {
     console.error("Erro ao encaminhar para Make:", error);
     return res.status(500).json({ message: "Erro interno ao repassar dados" });
