@@ -5,16 +5,6 @@ export default async function handler(req, res) {
 
   const { event, payment } = req.body;
 
-  // ✅ Novo tratamento para o CHECK_STATUS (fake status)
-  if (event === "CHECK_STATUS") {
-    // Aqui simulamos que o pagamento foi confirmado com sucesso
-    return res.status(200).json({
-      status: "pago",
-      nome: "Visitante Estação do Mel",
-    });
-  }
-
-  // ✅ Continua tratamento real do Asaas
   if (event !== "PAYMENT_RECEIVED") {
     return res.status(200).json({ message: "Evento ignorado" });
   }
