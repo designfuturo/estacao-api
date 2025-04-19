@@ -3,9 +3,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Método não permitido" });
   }
 
-  const { event, payment } = req.body;
+  const { event, payment, status, nome } = req.body;
 
-  if (event !== "PAYMENT_RECEIVED") {
+  if (event !== "PAYMENT_RECEIVED" && status !== "pago") {
     return res.status(200).json({ message: "Evento ignorado" });
   }
 
@@ -16,7 +16,11 @@ export default async function handler(req, res) {
       body: JSON.stringify(req.body),
     });
 
-    return res.status(200).json({ message: "Webhook processado com sucesso" });
+    // Agora retornamos o status e nome para o navegador
+    return res.status(200).json({
+      status: "pago",
+      nome: nome || (payment?.customer || "Cliente"),
+    });
   } catch (error) {
     console.error("Erro ao encaminhar para Make:", error);
     return res.status(500).json({ message: "Erro interno ao repassar dados" });
