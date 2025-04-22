@@ -93,12 +93,25 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Pedido enviado, mas não foi possível obter o link de pagamento." })
     }
 
+    // Verifica se a resposta é JSON mesmo
+    const contentType = resposta.headers.get("content-type") || ""
+    if (!contentType.includes("application/json")) {
+      const raw = await resposta.text()
+      console.error("Resposta inesperada do webhook (não é JSON):", raw)
+      return res.status(500).json({ error: "Resposta inválida do gerador de link de pagamento." })
+    }
+
     const json = await resposta.json()
+
     if (!json?.linkPagamento) {
       return res.status(500).json({ error: "Pedido salvo, mas link de pagamento não retornado." })
     }
 
-    return res.status(200).json({ ok: true, linkPagamento: json.linkPagamento })
+    return res.status(200).json({
+      ok: true,
+      linkPagamento: json.linkPagamento,
+      pedidoId,
+    })
   } catch (err) {
     console.error("Erro ao chamar webhook de pagamento:", err.message)
     return res.status(500).json({ error: "Erro ao gerar link de pagamento" })
