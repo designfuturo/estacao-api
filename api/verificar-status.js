@@ -1,6 +1,3 @@
-import fs from 'fs'
-import path from 'path'
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', 'https://estacaodomel.com.br')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -14,31 +11,34 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método não permitido' })
   }
 
+  const { pedidoId } = req.body
+
+  if (!pedidoId) {
+    return res.status(400).json({ error: 'pedidoId não fornecido' })
+  }
+
   try {
-    const { pedidoId } = req.body
+    const response = await fetch(`https://www.asaas.com/api/v3/payments/${pedidoId}`, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${process.env.ASAAS_API_KEY}`
+      }
+    })
 
-    if (!pedidoId) {
-      return res.status(400).json({ error: 'pedidoId não fornecido' })
+    const data = await response.json()
+
+    if (!response.ok) {
+      console.error('Erro na resposta da API do Asaas:', data)
+      return res.status(500).json({ error: 'Erro ao consultar status no Asaas' })
     }
 
-    const filePath = path.resolve('./', 'pedidos.json')
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Base de pedidos não encontrada' })
-    }
+    const statusValido = ['RECEIVED', 'CONFIRMED'].includes(data.status)
 
-    const fileData = fs.readFileSync(filePath)
-    const pedidos = JSON.parse(fileData).pedidos || []
-
-    const pedido = pedidos.find(p => p.id === pedidoId)
-
-    if (!pedido) {
-      return res.status(404).json({ error: 'Pedido não encontrado' })
-    }
-
-    return res.status(200).json({ status: pedido.status })
+    return res.status(200).json({ status: statusValido ? 'pago' : 'pendente' })
 
   } catch (error) {
     console.error('Erro ao verificar status do pedido:', error)
-    return res.status(500).json({ error: 'Erro interno no servidor' })
+    return res.status(500).json({ error: 'Erro interno ao verificar status do pagamento' })
   }
 }
