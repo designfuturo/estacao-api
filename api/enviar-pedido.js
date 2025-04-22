@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from "uuid"
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "https://estacaodomel.com.br")
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -33,24 +35,32 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Nenhum ingresso selecionado" })
   }
 
+  const pedidoId = uuidv4()
+  const criadoEm = new Date().toISOString()
+  const status = "pendente"
+
+  const payload = {
+    pedidoId,
+    nome,
+    email,
+    telefone,
+    cpf,
+    dataNascimento,
+    pagamento,
+    dataEvento,
+    qtdInteira,
+    qtdMeia,
+    qtdGratis,
+    totalPagar,
+    criadoEm,
+    status,
+  }
+
   try {
     const response = await fetch("https://hook.us2.make.com/4aypwyc1oekokjgncdibqpj8kynncfhf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nome,
-        email,
-        telefone,
-        cpf,
-        dataNascimento,
-        pagamento,
-        dataEvento,
-        qtdInteira,
-        qtdMeia,
-        qtdGratis,
-        totalPagar,
-        criadoEm: new Date().toISOString(),
-      }),
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
