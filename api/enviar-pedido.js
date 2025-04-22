@@ -3,10 +3,12 @@ import path from "path"
 import { v4 as uuidv4 } from "uuid"
 
 export default async function handler(req, res) {
+  // Configuração de CORS
   res.setHeader("Access-Control-Allow-Origin", "https://estacaodomel.com.br")
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type")
 
+  // Tratamento para preflight CORS
   if (req.method === "OPTIONS") {
     return res.status(200).end()
   }
@@ -40,10 +42,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Nenhum ingresso selecionado" })
   }
 
-  // Gera um ID único para o pedido
+  // Geração do ID do pedido
   const pedidoId = uuidv4()
 
-  // Caminho do arquivo local para salvar os pedidos
+  // Caminho do arquivo pedidos.json
   const filePath = path.resolve("./", "pedidos.json")
 
   let pedidos = []
@@ -70,10 +72,9 @@ export default async function handler(req, res) {
     qtdGratis,
     totalPagar,
     status: "pendente",
-    criadoEm: new Date().toISOString()
+    criadoEm: new Date().toISOString(),
   }
 
-  // Adiciona o novo pedido ao array
   pedidos.push(novoPedido)
 
   try {
@@ -83,7 +84,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Erro interno ao salvar pedido localmente" })
   }
 
-  // Continua com envio para Make
+  // Envia os dados para o Make
   try {
     const response = await fetch(makeWebhookUrl, {
       method: "POST",
@@ -103,14 +104,17 @@ export default async function handler(req, res) {
         qtdMeia,
         qtdGratis,
         totalPagar,
-        pedidoId // opcional: enviar esse ID para o Make também
+        pedidoId,
       }),
     })
 
     if (!response.ok) {
       const text = await response.text()
       console.error("Erro Make:", text)
-      return res.status(500).json({ error: "Erro ao enviar para o Make", detalhe: text })
+      return res.status(500).json({
+        error: "Erro ao enviar para o Make",
+        detalhe: text,
+      })
     }
 
     const resposta = await response.json()
@@ -119,7 +123,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         linkPagamento: resposta.linkPagamento,
-        pedidoId, // devolve ID do pedido para o frontend consultar depois
+        pedidoId,
       })
     } else {
       console.error("Resposta inesperada do Make:", resposta)
