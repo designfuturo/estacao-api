@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   const secret = process.env.WEBHOOK_SECRET
-  const makeWebhookUrl = 'https://hook.us2.make.com/4aypwyc1oekokjgncdibqpj8kynncfhf'
+  const makeWebhookUrl = "https://hook.us2.make.com/4aypwyc1oekokjgncdibqpj8kynncfhf"
 
   const {
     nome,
