@@ -1,3 +1,4 @@
+// /api/enviar-pedido.js
 import { v4 as uuidv4 } from "uuid"
 
 export default async function handler(req, res) {
@@ -37,41 +38,69 @@ export default async function handler(req, res) {
 
   const pedidoId = uuidv4()
   const criadoEm = new Date().toISOString()
-  const status = "pendente"
 
-  const payload = {
-    pedidoId,
-    nome,
-    email,
-    telefone,
-    cpf,
-    dataNascimento,
-    pagamento,
-    dataEvento,
-    qtdInteira,
-    qtdMeia,
-    qtdGratis,
-    totalPagar,
-    criadoEm,
-    status,
-  }
-
+  // 1. Envia para planilha (cenário 1)
   try {
-    const response = await fetch("https://hook.us2.make.com/4aypwyc1oekokjgncdibqpj8kynncfhf", {
+    await fetch("https://hook.us2.make.com/4aypwyc1oekokjgncdibqpj8kynncfhf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        pedidoId,
+        nome,
+        email,
+        telefone,
+        cpf,
+        dataNascimento,
+        pagamento,
+        dataEvento,
+        qtdInteira,
+        qtdMeia,
+        qtdGratis,
+        totalPagar,
+        status: "pendente",
+        criadoEm,
+      }),
+    })
+  } catch (err) {
+    console.error("Erro ao salvar na planilha:", err)
+    return res.status(500).json({ error: "Erro ao salvar na planilha" })
+  }
+
+  // 2. Envia para gerar link de pagamento (cenário 2)
+  try {
+    const resposta = await fetch("https://hook.us2.make.com/urh3qrkkaikwcftjimdjh1w1i9sh7mge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pedidoId,
+        nome,
+        email,
+        telefone,
+        cpf,
+        dataNascimento,
+        pagamento,
+        dataEvento,
+        qtdInteira,
+        qtdMeia,
+        qtdGratis,
+        totalPagar,
+      }),
     })
 
-    if (!response.ok) {
-      const text = await response.text()
-      console.error("Erro ao enviar para Make:", text)
-      return res.status(500).json({ error: "Erro ao enviar para o Make" })
+    if (!resposta.ok) {
+      const text = await resposta.text()
+      console.error("Erro ao gerar link:", text)
+      return res.status(500).json({ error: "Pedido enviado, mas não foi possível obter o link de pagamento." })
     }
 
-    return res.status(200).json({ ok: true })
+    const json = await resposta.json()
+    if (!json?.linkPagamento) {
+      return res.status(500).json({ error: "Pedido salvo, mas link de pagamento não retornado." })
+    }
+
+    return res.status(200).json({ ok: true, linkPagamento: json.linkPagamento })
   } catch (err) {
-    console.error("Erro interno:", err.message)
-    return res.status(500).json({ error: "Erro interno", detalhe: err.message })
+    console.error("Erro ao chamar webhook de pagamento:", err.message)
+    return res.status(500).json({ error: "Erro ao gerar link de pagamento" })
   }
 }
