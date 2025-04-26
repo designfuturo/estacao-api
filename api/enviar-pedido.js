@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     !telefone || typeof telefone !== "string" ||
     !cpf || typeof cpf !== "string" ||
     !dataEvento || typeof dataEvento !== "string" ||
-    !pagamento || !["PIX", "boleto", "cartao_credito", "cartao_debito"].includes(pagamento) ||
+    !pagamento || !["PIX", "BOLETO", "CREDIT_CARD"].includes(pagamento) ||
     typeof totalPagar !== "number" ||
     typeof qtdInteira !== "number" ||
     typeof qtdMeia !== "number" ||
