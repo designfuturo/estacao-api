@@ -1,4 +1,3 @@
-// /api/enviar-pedido.js
 import { v4 as uuidv4 } from "uuid"
 
 export default async function handler(req, res) {
@@ -28,8 +27,20 @@ export default async function handler(req, res) {
     totalPagar,
   } = req.body
 
-  if (!nome || !email || !telefone || !cpf || !dataEvento || !pagamento || !totalPagar) {
-    return res.status(400).json({ error: "Campos obrigatórios ausentes" })
+  // 🔥 Validação forte dos campos obrigatórios
+  if (
+    !nome || typeof nome !== "string" ||
+    !email || typeof email !== "string" ||
+    !telefone || typeof telefone !== "string" ||
+    !cpf || typeof cpf !== "string" ||
+    !dataEvento || typeof dataEvento !== "string" ||
+    !pagamento || !["PIX", "boleto", "cartao_credito", "cartao_debito"].includes(pagamento) ||
+    typeof totalPagar !== "number" ||
+    typeof qtdInteira !== "number" ||
+    typeof qtdMeia !== "number" ||
+    typeof qtdGratis !== "number"
+  ) {
+    return res.status(400).json({ error: "Dados inválidos ou campos obrigatórios ausentes" })
   }
 
   if ((qtdInteira + qtdMeia + qtdGratis) === 0) {
@@ -39,18 +50,18 @@ export default async function handler(req, res) {
   const pedidoId = uuidv4()
   const criadoEm = new Date().toISOString()
 
-  // 1. Envia para planilha (cenário 1)
+  // 1. Salvar pedido na planilha
   try {
     await fetch("https://hook.us2.make.com/4aypwyc1oekokjgncdibqpj8kynncfhf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         pedidoId,
-        nome,
-        email,
-        telefone,
-        cpf,
-        dataNascimento,
+        nome: nome.trim(),
+        email: email.trim(),
+        telefone: telefone.trim(),
+        cpf: cpf.trim(),
+        dataNascimento: dataNascimento ? dataNascimento.trim() : "",
         pagamento,
         dataEvento,
         qtdInteira,
@@ -63,21 +74,21 @@ export default async function handler(req, res) {
     })
   } catch (err) {
     console.error("Erro ao salvar na planilha:", err)
-    return res.status(500).json({ error: "Erro ao salvar na planilha" })
+    return res.status(500).json({ error: "Erro ao salvar o pedido na planilha" })
   }
 
-  // 2. Envia para gerar link de pagamento (cenário 2)
+  // 2. Gerar link de pagamento
   try {
     const resposta = await fetch("https://hook.us2.make.com/urh3qrkkaikwcftjimdjh1w1i9sh7mge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         pedidoId,
-        nome,
-        email,
-        telefone,
-        cpf,
-        dataNascimento,
+        nome: nome.trim(),
+        email: email.trim(),
+        telefone: telefone.trim(),
+        cpf: cpf.trim(),
+        dataNascimento: dataNascimento ? dataNascimento.trim() : "",
         pagamento,
         dataEvento,
         qtdInteira,
@@ -89,11 +100,10 @@ export default async function handler(req, res) {
 
     if (!resposta.ok) {
       const text = await resposta.text()
-      console.error("Erro ao gerar link:", text)
+      console.error("Erro ao gerar link de pagamento:", text)
       return res.status(500).json({ error: "Pedido enviado, mas não foi possível obter o link de pagamento." })
     }
 
-    // Verifica se a resposta é JSON mesmo
     const contentType = resposta.headers.get("content-type") || ""
     if (!contentType.includes("application/json")) {
       const raw = await resposta.text()
