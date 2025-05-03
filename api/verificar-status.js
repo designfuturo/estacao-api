@@ -26,7 +26,20 @@ export default async function handler(req, res) {
       }
     })
 
-    const data = await response.json()
+    const text = await response.text()
+
+    if (!text) {
+      console.error('Resposta vazia da API do Asaas.')
+      return res.status(500).json({ error: 'Resposta vazia da API do Asaas' })
+    }
+
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch (parseError) {
+      console.error('Erro ao fazer parse do JSON:', parseError)
+      return res.status(500).json({ error: 'Resposta do Asaas não é um JSON válido' })
+    }
 
     if (!response.ok) {
       console.error('Erro na resposta da API do Asaas:', data)
