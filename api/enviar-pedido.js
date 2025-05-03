@@ -1,14 +1,11 @@
 import { v4 as uuidv4 } from "uuid"
-import axios from "axios"
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "https://estacaodomel.com.br")
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type")
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end()
-  }
+  if (req.method === "OPTIONS") return res.status(200).end()
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" })
@@ -26,31 +23,32 @@ export default async function handler(req, res) {
     qtdMeia,
     qtdGratis,
     totalPagar,
-    recaptchaToken, // ⚠️ novo campo vindo do front
+    recaptchaToken,
   } = req.body
 
-  // 🔒 Verificação do Google reCAPTCHA
-  try {
-    const verificaCaptcha = await axios.post(
-      "https://www.google.com/recaptcha/api/siteverify",
-      null,
-      {
-        params: {
-          secret: "6Ld2_CwrAAAAANrBLJsuE80mla5AYngQTKb11ypQ", // sua secret key
-          response: recaptchaToken,
-        },
-      }
-    )
-
-    if (!verificaCaptcha.data.success) {
-      return res.status(403).json({ error: "Falha na verificação do reCAPTCHA." })
-    }
-  } catch (err) {
-    console.error("Erro ao verificar reCAPTCHA:", err)
-    return res.status(500).json({ error: "Erro interno na verificação do reCAPTCHA." })
+  // ✅ Verificação do token reCAPTCHA
+  if (!recaptchaToken) {
+    return res.status(400).json({ error: "reCAPTCHA não verificado" })
   }
 
-  // 🔥 Validação forte dos campos obrigatórios
+  try {
+    const resposta = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `secret=6Ld2_CwrAAAAANrBLJsuE80mla5AYngQTKb11ypQ&response=${recaptchaToken}`,
+    })
+
+    const resultado = await resposta.json()
+
+    if (!resultado.success) {
+      return res.status(403).json({ error: "Falha na verificação do reCAPTCHA" })
+    }
+  } catch (err) {
+    console.error("Erro ao validar reCAPTCHA:", err)
+    return res.status(500).json({ error: "Erro ao validar reCAPTCHA" })
+  }
+
+  // 🔒 Validação forte dos campos
   if (
     !nome || typeof nome !== "string" ||
     !email || typeof email !== "string" ||
