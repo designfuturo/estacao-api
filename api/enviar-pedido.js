@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid"
+import axios from "axios"
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "https://estacaodomel.com.br")
@@ -25,7 +26,29 @@ export default async function handler(req, res) {
     qtdMeia,
     qtdGratis,
     totalPagar,
+    recaptchaToken, // ⚠️ novo campo vindo do front
   } = req.body
+
+  // 🔒 Verificação do Google reCAPTCHA
+  try {
+    const verificaCaptcha = await axios.post(
+      "https://www.google.com/recaptcha/api/siteverify",
+      null,
+      {
+        params: {
+          secret: "6Ld2_CwrAAAAANrBLJsuE80mla5AYngQTKb11ypQ", // sua secret key
+          response: recaptchaToken,
+        },
+      }
+    )
+
+    if (!verificaCaptcha.data.success) {
+      return res.status(403).json({ error: "Falha na verificação do reCAPTCHA." })
+    }
+  } catch (err) {
+    console.error("Erro ao verificar reCAPTCHA:", err)
+    return res.status(500).json({ error: "Erro interno na verificação do reCAPTCHA." })
+  }
 
   // 🔥 Validação forte dos campos obrigatórios
   if (
