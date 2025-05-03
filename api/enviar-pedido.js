@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     recaptchaToken,
   } = req.body
 
-  // ✅ Verificação do token reCAPTCHA
+  // 🔒 Verificação segura do token reCAPTCHA
   if (!recaptchaToken) {
     return res.status(400).json({ error: "reCAPTCHA não verificado" })
   }
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const resposta = await fetch("https://www.google.com/recaptcha/api/siteverify", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `secret=6Ld2_CwrAAAAANrBLJsuE80mla5AYngQTKb11ypQ&response=${recaptchaToken}`,
+      body: `secret=${process.env.RECAPTCHA_SECRET}&response=${recaptchaToken}`,
     })
 
     const resultado = await resposta.json()
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Erro ao validar reCAPTCHA" })
   }
 
-  // 🔒 Validação forte dos campos
+  // 🔎 Validação dos dados
   if (
     !nome || typeof nome !== "string" ||
     !email || typeof email !== "string" ||
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
   const pedidoId = uuidv4()
   const criadoEm = new Date().toISOString()
 
-  // 1. Salvar pedido na planilha
+  // 📝 Etapa 1: Salvar pedido na planilha
   try {
     await fetch("https://hook.us2.make.com/4aypwyc1oekokjgncdibqpj8kynncfhf", {
       method: "POST",
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Erro ao salvar o pedido na planilha" })
   }
 
-  // 2. Gerar link de pagamento
+  // 💳 Etapa 2: Gerar link de pagamento via Make
   try {
     const resposta = await fetch("https://hook.us2.make.com/urh3qrkkaikwcftjimdjh1w1i9sh7mge", {
       method: "POST",
