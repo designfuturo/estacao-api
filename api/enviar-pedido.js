@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     pagamento,
     dataEvento,
     qtdInteira,
-    qtdMeia,
+    qtdSenior,
     qtdGratis,
     totalPagar,
     recaptchaToken,
@@ -58,13 +58,13 @@ export default async function handler(req, res) {
     !pagamento || !["PIX", "BOLETO", "CREDIT_CARD"].includes(pagamento) ||
     typeof totalPagar !== "number" ||
     typeof qtdInteira !== "number" ||
-    typeof qtdMeia !== "number" ||
+    typeof qtdSenior !== "number" ||
     typeof qtdGratis !== "number"
   ) {
     return res.status(400).json({ error: "Dados inválidos ou campos obrigatórios ausentes" })
   }
 
-  if ((qtdInteira + qtdMeia + qtdGratis) === 0) {
+  if ((qtdInteira + qtdSenior + qtdGratis) === 0) {
     return res.status(400).json({ error: "Nenhum ingresso selecionado" })
   }
 
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
         pagamento,
         dataEvento,
         qtdInteira,
-        qtdMeia,
+        qtdSenior,
         qtdGratis,
         totalPagar,
         status: "pendente",
@@ -113,7 +113,7 @@ export default async function handler(req, res) {
         pagamento,
         dataEvento,
         qtdInteira,
-        qtdMeia,
+        qtdSenior,
         qtdGratis,
         totalPagar,
       }),
