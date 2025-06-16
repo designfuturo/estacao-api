@@ -19,10 +19,12 @@ export default async function handler(req, res) {
     dataNascimento,
     pagamento,
     dataEvento,
-    qtdInteira,
-    qtdSenior,
-    qtdGratis,
     totalPagar,
+    qtdInteira = 0,
+    qtdSenior = 0,
+    qtdGratis = 0,
+    qtdInscritos = 0,
+    tipoProduto = "evento",
     recaptchaToken,
   } = req.body
 
@@ -48,7 +50,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Erro ao validar reCAPTCHA" })
   }
 
-  // 🔎 Validação dos dados
+  // ✅ Validação básica (comum)
   if (
     !nome || typeof nome !== "string" ||
     !email || typeof email !== "string" ||
@@ -56,16 +58,25 @@ export default async function handler(req, res) {
     !cpf || typeof cpf !== "string" ||
     !dataEvento || typeof dataEvento !== "string" ||
     !pagamento || !["PIX", "BOLETO", "CREDIT_CARD"].includes(pagamento) ||
-    typeof totalPagar !== "number" ||
-    typeof qtdInteira !== "number" ||
-    typeof qtdSenior !== "number" ||
-    typeof qtdGratis !== "number"
+    typeof totalPagar !== "number"
   ) {
     return res.status(400).json({ error: "Dados inválidos ou campos obrigatórios ausentes" })
   }
 
-  if ((qtdInteira + qtdSenior + qtdGratis) === 0) {
-    return res.status(400).json({ error: "Nenhum ingresso selecionado" })
+  // ✅ Validação por tipo de produto
+  if (tipoProduto === "evento") {
+    if (
+      typeof qtdInteira !== "number" ||
+      typeof qtdSenior !== "number" ||
+      typeof qtdGratis !== "number" ||
+      (qtdInteira + qtdSenior + qtdGratis) === 0
+    ) {
+      return res.status(400).json({ error: "Ingressos inválidos ou ausentes para evento" })
+    }
+  } else if (tipoProduto === "curso") {
+    if (typeof qtdInscritos !== "number" || qtdInscritos <= 0) {
+      return res.status(400).json({ error: "Quantidade de participantes inválida para o curso" })
+    }
   }
 
   const pedidoId = uuidv4()
@@ -88,7 +99,9 @@ export default async function handler(req, res) {
         qtdInteira,
         qtdSenior,
         qtdGratis,
+        qtdInscritos,
         totalPagar,
+        tipoProduto,
         status: "pendente",
         criadoEm,
       }),
@@ -115,7 +128,9 @@ export default async function handler(req, res) {
         qtdInteira,
         qtdSenior,
         qtdGratis,
+        qtdInscritos,
         totalPagar,
+        tipoProduto,
       }),
     })
 
