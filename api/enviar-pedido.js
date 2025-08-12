@@ -6,7 +6,6 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type")
 
   if (req.method === "OPTIONS") return res.status(200).end()
-
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" })
   }
@@ -26,22 +25,20 @@ export default async function handler(req, res) {
     qtdInscritos = 0,
     tipoProduto = "evento",
     recaptchaToken,
+    parcelas: parcelasBody,               // >>> opcional, vindo do checkout (curso+cartão)
   } = req.body
 
-  // 🔒 Verificação segura do token reCAPTCHA
+  // 🔒 reCAPTCHA (inalterado)
   if (!recaptchaToken) {
     return res.status(400).json({ error: "reCAPTCHA não verificado" })
   }
-
   try {
     const resposta = await fetch("https://www.google.com/recaptcha/api/siteverify", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: `secret=${process.env.RECAPTCHA_SECRET}&response=${recaptchaToken}`,
     })
-
     const resultado = await resposta.json()
-
     if (!resultado.success) {
       return res.status(403).json({ error: "Falha na verificação do reCAPTCHA" })
     }
@@ -50,7 +47,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Erro ao validar reCAPTCHA" })
   }
 
-  // ✅ Validação básica (comum)
+  // ✅ Validação básica (inalterada)
   if (
     !nome || typeof nome !== "string" ||
     !email || typeof email !== "string" ||
@@ -63,7 +60,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Dados inválidos ou campos obrigatórios ausentes" })
   }
 
-  // ✅ Validação por tipo de produto
+  // ✅ Validação por tipo de produto (inalterada)
   if (tipoProduto === "evento") {
     if (
       typeof qtdInteira !== "number" ||
@@ -79,10 +76,20 @@ export default async function handler(req, res) {
     }
   }
 
+  // >>> Regras EXCLUSIVAS do curso (sem vazar pro Café)
+  const isCurso = tipoProduto === "curso"
+  const descontoAvistaPct = 0.10
+  // se curso + cartão, parcelas = inteiro 1..10 (default 10); caso contrário, null
+  const parcelas = (isCurso && pagamento === "CREDIT_CARD")
+    ? (Number.isInteger(parcelasBody) ? Math.min(Math.max(parcelasBody, 1), 10) : 10)
+    : null
+  const aplicarDescontoAvista = isCurso && (pagamento === "PIX" || pagamento === "BOLETO")
+  // <<<
+
   const pedidoId = uuidv4()
   const criadoEm = new Date().toISOString()
 
-  // 📝 Etapa 1: Salvar pedido na planilha
+  // 📝 Etapa 1: Salvar pedido na planilha (mantido, só adiciona info útil p/ auditoria)
   try {
     await fetch("https://hook.us2.make.com/4aypwyc1oekokjgncdibqpj8kynncfhf", {
       method: "POST",
@@ -102,6 +109,11 @@ export default async function handler(req, res) {
         qtdInscritos,
         totalPagar,
         tipoProduto,
+        // >>> campos só informativos (não quebram nada se a planilha ignorar)
+        parcelas,
+        aplicarDescontoAvista,
+        descontoAvistaPct: aplicarDescontoAvista ? descontoAvistaPct : 0,
+        // <<<
         status: "pendente",
         criadoEm,
       }),
@@ -111,7 +123,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Erro ao salvar o pedido na planilha" })
   }
 
-  // 💳 Etapa 2: Gerar link de pagamento via Make
+  // 💳 Etapa 2: Gerar link de pagamento via Make (envia sinais claros)
   try {
     const resposta = await fetch("https://hook.us2.make.com/urh3qrkkaikwcftjimdjh1w1i9sh7mge", {
       method: "POST",
@@ -129,8 +141,13 @@ export default async function handler(req, res) {
         qtdSenior,
         qtdGratis,
         qtdInscritos,
-        totalPagar,
+        totalPagar,             // valor base (sem desconto)
         tipoProduto,
+        // >>> sinais para o cenário do Make/Asaas
+        parcelas,               // null para Café; 10 (ou 1..10) para Curso+Cartão
+        aplicarDescontoAvista,  // true só para Curso + PIX/BOLETO
+        descontoAvistaPct: aplicarDescontoAvista ? descontoAvistaPct : 0,
+        // <<<
       }),
     })
 
