@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid"
 
 export default async function handler(req, res) {
+  // CORS
   res.setHeader("Access-Control-Allow-Origin", "https://estacaodomel.com.br")
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type")
@@ -24,8 +25,7 @@ export default async function handler(req, res) {
     qtdGratis = 0,
     qtdInscritos = 0,
     tipoProduto = "evento",
-    recaptchaToken,
-    parcelas: parcelasBody,               // opcional (curso + cartão)
+    recaptchaToken
   } = req.body
 
   // 🔒 reCAPTCHA
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Dados inválidos ou campos obrigatórios ausentes" })
   }
 
-  // ✅ Validação por tipo de produto
+  // ✅ Validação por tipo de produto (mantém Café intacto)
   if (tipoProduto === "evento") {
     if (
       typeof qtdInteira !== "number" ||
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
     }
   }
 
-// 💰 Todos os pagamentos são à vista; sem desconto
+  // 💰 Todos os pagamentos são à vista; sem desconto
   const valorCobranca = +Number(totalPagar || 0).toFixed(2)
 
   const pedidoId = uuidv4()
@@ -102,12 +102,8 @@ export default async function handler(req, res) {
         qtdInscritos,
         totalPagar,
         tipoProduto,
-        // informativos para auditoria/relatórios
-        aplicarDescontoAvista,
-        descontoAvistaPct: aplicarDescontoAvista ? descontoAvistaPct : 0,
-        parcelas,                // null para à vista ou Café
-        valorCobranca,           // << NOVO
-        valorParcela,            // << NOVO (apenas cartão)
+        valorCobranca,      // registro p/ relatórios
+        value: valorCobranca, // opcional: espelho do valor
         status: "pendente",
         criadoEm,
       }),
@@ -129,47 +125,39 @@ export default async function handler(req, res) {
         telefone: telefone.trim(),
         cpf: cpf.trim(),
         dataNascimento: dataNascimento ? dataNascimento.trim() : "",
-        pagamento,
+        pagamento,           // PIX | BOLETO | CREDIT_CARD (à vista)
         dataEvento,
         qtdInteira,
         qtdSenior,
         qtdGratis,
         qtdInscritos,
-        totalPagar,              // valor base (sempre enviado)
+        totalPagar,
         tipoProduto,
-        // sinais + valores calculados p/ o cenário no Make/Asaas
-        aplicarDescontoAvista,   // true só para Curso + PIX/BOLETO
-        descontoAvistaPct: aplicarDescontoAvista ? descontoAvistaPct : 0,
-        parcelas,                // null para Café/à vista; 1..10 para cartão
-        valorCobranca,           // << NOVO (usar como "value" no Asaas)
-        valorParcela,            // << NOVO (para descrição/planilha/e-mail)
+        valorCobranca,       // usar como "value" no Asaas
+        value: valorCobranca // campo redundante para mapeamentos antigos
       }),
     })
 
     if (!resposta.ok) {
-      const text = await resposta.text()
-      console.error("Erro ao gerar link de pagamento:", text)
+      const raw = await resposta.text()
+      console.error("Erro ao gerar link de pagamento (webhook):", resposta.status, raw)
       return res.status(500).json({ error: "Pedido enviado, mas não foi possível obter o link de pagamento." })
     }
 
     const contentType = resposta.headers.get("content-type") || ""
     if (!contentType.includes("application/json")) {
       const raw = await resposta.text()
-      console.error("Resposta inesperada do webhook (não é JSON):", raw)
+      console.error("Resposta inesperada do webhook (não JSON):", raw)
       return res.status(500).json({ error: "Resposta inválida do gerador de link de pagamento." })
     }
 
     const json = await resposta.json()
-
     if (!json?.linkPagamento) {
+      console.error("Webhook OK mas sem linkPagamento:", JSON.stringify(json))
       return res.status(500).json({ error: "Pedido salvo, mas link de pagamento não retornado." })
     }
 
-    return res.status(200).json({
-      ok: true,
-      linkPagamento: json.linkPagamento,
-      pedidoId,
-    })
+    return res.status(200).json({ ok: true, linkPagamento: json.linkPagamento, pedidoId })
   } catch (err) {
     console.error("Erro ao chamar webhook de pagamento:", err.message)
     return res.status(500).json({ error: "Erro ao gerar link de pagamento" })
