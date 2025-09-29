@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid"
 
 export default async function handler(req, res) {
+  // CORS
   res.setHeader("Access-Control-Allow-Origin", "https://estacaodomel.com.br")
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type")
@@ -24,11 +25,10 @@ export default async function handler(req, res) {
     qtdGratis = 0,
     qtdInscritos = 0,
     tipoProduto = "evento",
-    recaptchaToken,
-    parcelas: parcelasBody,               // opcional (curso + cartão)
+    recaptchaToken
   } = req.body
 
-  // 🔒 reCAPTCHA
+  // 🔒 reCAPTCHA obrigatório
   if (!recaptchaToken) {
     return res.status(400).json({ error: "reCAPTCHA não verificado" })
   }
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Dados inválidos ou campos obrigatórios ausentes" })
   }
 
-  // ✅ Validação por tipo de produto
+  // ✅ Validação por tipo de produto (mantém fluxo do Café)
   if (tipoProduto === "evento") {
     if (
       typeof qtdInteira !== "number" ||
@@ -76,32 +76,8 @@ export default async function handler(req, res) {
     }
   }
 
-  // >>> Regras EXCLUSIVAS do curso (não afetam o Café)
-  const isCurso = tipoProduto === "curso"
-  const descontoAvistaPct = 0.10
-
-  // parcelas (somente curso + cartão). Aceita string "10" vindas do front.
-  const parcelasNum = parseInt(parcelasBody, 10)
-  const parcelas = (isCurso && pagamento === "CREDIT_CARD")
-    ? (Number.isInteger(parcelasNum) ? Math.min(Math.max(parcelasNum, 1), 10) : 10)
-    : null
-
-  const aplicarDescontoAvista = isCurso && (pagamento === "PIX" || pagamento === "BOLETO")
-
-  // **NOVO**: valor a cobrar e valor da parcela (quando cartão)
-  let valorCobranca = +Number(totalPagar || 0).toFixed(2)
-  let valorParcela = null
-
-  if (isCurso) {
-    if (aplicarDescontoAvista) {
-      valorCobranca = +Number(totalPagar * (1 - descontoAvistaPct)).toFixed(2)
-    } else if (pagamento === "CREDIT_CARD") {
-      valorCobranca = +Number(totalPagar).toFixed(2) // sem desconto no cartão
-      const n = parcelas || 10
-      valorParcela = +Number(valorCobranca / n).toFixed(2) // informativo
-    }
-  }
-  // <<<
+  // 💰 Valor a cobrar (sempre à vista; sem desconto)
+  const valorCobranca = +Number(totalPagar || 0).toFixed(2)
 
   const pedidoId = uuidv4()
   const criadoEm = new Date().toISOString()
@@ -126,12 +102,7 @@ export default async function handler(req, res) {
         qtdInscritos,
         totalPagar,
         tipoProduto,
-        // informativos para auditoria/relatórios
-        aplicarDescontoAvista,
-        descontoAvistaPct: aplicarDescontoAvista ? descontoAvistaPct : 0,
-        parcelas,                // null para à vista ou Café
-        valorCobranca,           // << NOVO
-        valorParcela,            // << NOVO (apenas cartão)
+        valorCobranca,     // usar este valor para relatórios/auditoria
         status: "pendente",
         criadoEm,
       }),
@@ -153,20 +124,15 @@ export default async function handler(req, res) {
         telefone: telefone.trim(),
         cpf: cpf.trim(),
         dataNascimento: dataNascimento ? dataNascimento.trim() : "",
-        pagamento,
+        pagamento,         // PIX | BOLETO | CREDIT_CARD (todos à vista)
         dataEvento,
         qtdInteira,
         qtdSenior,
         qtdGratis,
         qtdInscritos,
-        totalPagar,              // valor base (sempre enviado)
+        totalPagar,        // base informativa
         tipoProduto,
-        // sinais + valores calculados p/ o cenário no Make/Asaas
-        aplicarDescontoAvista,   // true só para Curso + PIX/BOLETO
-        descontoAvistaPct: aplicarDescontoAvista ? descontoAvistaPct : 0,
-        parcelas,                // null para Café/à vista; 1..10 para cartão
-        valorCobranca,           // << NOVO (usar como "value" no Asaas)
-        valorParcela,            // << NOVO (para descrição/planilha/e-mail)
+        valorCobranca      // <- no Make/Asaas mapear para "value"
       }),
     })
 
@@ -184,7 +150,6 @@ export default async function handler(req, res) {
     }
 
     const json = await resposta.json()
-
     if (!json?.linkPagamento) {
       return res.status(500).json({ error: "Pedido salvo, mas link de pagamento não retornado." })
     }
