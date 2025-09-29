@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from "uuid"
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader("Access-Control-Allow-Origin", "https://estacaodomel.com.br")
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type")
@@ -25,10 +24,11 @@ export default async function handler(req, res) {
     qtdGratis = 0,
     qtdInscritos = 0,
     tipoProduto = "evento",
-    recaptchaToken
+    recaptchaToken,
+    parcelas: parcelasBody,               // opcional (curso + cartão)
   } = req.body
 
-  // 🔒 reCAPTCHA obrigatório
+  // 🔒 reCAPTCHA
   if (!recaptchaToken) {
     return res.status(400).json({ error: "reCAPTCHA não verificado" })
   }
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Dados inválidos ou campos obrigatórios ausentes" })
   }
 
-  // ✅ Validação por tipo de produto (mantém fluxo do Café)
+  // ✅ Validação por tipo de produto
   if (tipoProduto === "evento") {
     if (
       typeof qtdInteira !== "number" ||
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // 💰 Valor a cobrar (sempre à vista; sem desconto)
+// 💰 Todos os pagamentos são à vista; sem desconto
   const valorCobranca = +Number(totalPagar || 0).toFixed(2)
 
   const pedidoId = uuidv4()
@@ -102,7 +102,12 @@ export default async function handler(req, res) {
         qtdInscritos,
         totalPagar,
         tipoProduto,
-        valorCobranca,     // usar este valor para relatórios/auditoria
+        // informativos para auditoria/relatórios
+        aplicarDescontoAvista,
+        descontoAvistaPct: aplicarDescontoAvista ? descontoAvistaPct : 0,
+        parcelas,                // null para à vista ou Café
+        valorCobranca,           // << NOVO
+        valorParcela,            // << NOVO (apenas cartão)
         status: "pendente",
         criadoEm,
       }),
@@ -124,15 +129,20 @@ export default async function handler(req, res) {
         telefone: telefone.trim(),
         cpf: cpf.trim(),
         dataNascimento: dataNascimento ? dataNascimento.trim() : "",
-        pagamento,         // PIX | BOLETO | CREDIT_CARD (todos à vista)
+        pagamento,
         dataEvento,
         qtdInteira,
         qtdSenior,
         qtdGratis,
         qtdInscritos,
-        totalPagar,        // base informativa
+        totalPagar,              // valor base (sempre enviado)
         tipoProduto,
-        valorCobranca      // <- no Make/Asaas mapear para "value"
+        // sinais + valores calculados p/ o cenário no Make/Asaas
+        aplicarDescontoAvista,   // true só para Curso + PIX/BOLETO
+        descontoAvistaPct: aplicarDescontoAvista ? descontoAvistaPct : 0,
+        parcelas,                // null para Café/à vista; 1..10 para cartão
+        valorCobranca,           // << NOVO (usar como "value" no Asaas)
+        valorParcela,            // << NOVO (para descrição/planilha/e-mail)
       }),
     })
 
@@ -150,6 +160,7 @@ export default async function handler(req, res) {
     }
 
     const json = await resposta.json()
+
     if (!json?.linkPagamento) {
       return res.status(500).json({ error: "Pedido salvo, mas link de pagamento não retornado." })
     }
